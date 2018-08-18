@@ -11,7 +11,7 @@ namespace RansomRecover
   {
     static void Main(string[] args)
     {
-      if(args.Length != 2)
+      if(args.Length != 3)
       {
         Console.WriteLine("Usage: RansomRecover.exe Extension TargetDir SourceDir");
       }
@@ -48,9 +48,13 @@ namespace RansomRecover
         matchedFiles.Count,
         unmatchedFiles.Count,
         100.0 * matchedFiles.Count / files.Count());
+      Console.WriteLine("");
+      int i = 0;
       foreach(var (src, target) in matchedFiles)
       {
-        Console.WriteLine("Restoring {0}", target);
+        Console.Write('\r');
+        Console.Write(new string(' ', Console.BufferWidth - 1));
+        Console.Write("\rRestoring ({1}/{2}): {0}", target, ++i, matchedFiles.Count);
         if (File.GetAttributes(src).HasFlag(FileAttributes.ReadOnly))
         {
           File.SetAttributes(src, File.GetAttributes(src) & ~FileAttributes.ReadOnly);
