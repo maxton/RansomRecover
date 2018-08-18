@@ -51,13 +51,19 @@ namespace RansomRecover
       foreach(var (src, target) in matchedFiles)
       {
         Console.WriteLine("Restoring {0}", target);
+        if (File.GetAttributes(src).HasFlag(FileAttributes.ReadOnly))
+        {
+          File.SetAttributes(src, File.GetAttributes(src) & ~FileAttributes.ReadOnly);
+        }
         File.Copy(src, target);
         File.SetCreationTimeUtc(target, File.GetCreationTimeUtc(src));
         File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(src));
         File.SetLastAccessTimeUtc(target, File.GetLastAccessTimeUtc(src));
         if(new FileInfo(src).Length == new FileInfo(target).Length)
         {
-          File.Delete(target + pattern);
+          var badFile = target + pattern;
+          File.SetAttributes(badFile, FileAttributes.Normal);
+          File.Delete(badFile);
         }
       }
     }
