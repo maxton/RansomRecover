@@ -11,9 +11,9 @@ namespace RansomRecover
   {
     static void Main(string[] args)
     {
-      if(args.Length != 3)
+      if(args.Length < 3)
       {
-        Console.WriteLine("Usage: RansomRecover.exe Extension TargetDir SourceDir");
+        Console.WriteLine("Usage: RansomRecover.exe Extension TargetDir SourceDir [report.txt]");
       }
       string pattern = args[0];
       string targetDir = args[1];
@@ -43,31 +43,70 @@ namespace RansomRecover
           unmatchedFilesSize += length;
         }
       }
+      var encryptedCount = files.Count();
       Console.WriteLine(
         "Found {0} matches and {1} unmatched. {2:0.00}% recovery",
         matchedFiles.Count,
         unmatchedFiles.Count,
-        100.0 * matchedFiles.Count / files.Count());
+        100.0 * matchedFiles.Count / encryptedCount);
       Console.WriteLine("");
+      var errors = new List<string>();
       int i = 0;
       foreach(var (src, target) in matchedFiles)
       {
         Console.Write('\r');
         Console.Write(new string(' ', Console.BufferWidth - 1));
         Console.Write("\rRestoring ({1}/{2}): {0}", target, ++i, matchedFiles.Count);
-        if (File.GetAttributes(src).HasFlag(FileAttributes.ReadOnly))
+        try
         {
-          File.SetAttributes(src, File.GetAttributes(src) & ~FileAttributes.ReadOnly);
+          if (File.GetAttributes(src).HasFlag(FileAttributes.ReadOnly))
+          {
+            File.SetAttributes(src, File.GetAttributes(src) & ~FileAttributes.ReadOnly);
+          }
+          File.Copy(src, target);
+          File.SetCreationTimeUtc(target, File.GetCreationTimeUtc(src));
+          File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(src));
+          File.SetLastAccessTimeUtc(target, File.GetLastAccessTimeUtc(src));
+          if (new FileInfo(src).Length == new FileInfo(target).Length)
+          {
+            var badFile = target + pattern;
+            File.SetAttributes(badFile, FileAttributes.Normal);
+            File.Delete(badFile);
+          }
         }
-        File.Copy(src, target);
-        File.SetCreationTimeUtc(target, File.GetCreationTimeUtc(src));
-        File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(src));
-        File.SetLastAccessTimeUtc(target, File.GetLastAccessTimeUtc(src));
-        if(new FileInfo(src).Length == new FileInfo(target).Length)
+        catch (Exception e)
         {
-          var badFile = target + pattern;
-          File.SetAttributes(badFile, FileAttributes.Normal);
-          File.Delete(badFile);
+          errors.Add(e.Message);
+          Console.WriteLine("\r\nError!: " + e.Message);
+        }
+      }
+      if(args.Length == 4)
+      {
+        using (var f = File.OpenWrite(args[3]))
+        using (var sw = new StreamWriter(f))
+        {
+          sw.WriteLine("== Summary ==");
+          sw.WriteLine("Source: {0}", sourceDir);
+          sw.WriteLine("Target: {0}", targetDir);
+          sw.WriteLine(
+            "{0} matches and {1} unmatched. {2:0.00}% recovery",
+            matchedFiles.Count,
+            unmatchedFiles.Count,
+            100.0 * matchedFiles.Count / encryptedCount);
+          sw.WriteLine("Encrypted files size: {0}", totalEncryptedSize);
+          sw.WriteLine("Matched files size:   {0}", matchedFilesSize);
+          sw.WriteLine("Unmatched files size: {0}", unmatchedFilesSize);
+          sw.WriteLine("=============================================");
+          sw.WriteLine("Errors:\r\n");
+          foreach(var e in errors)
+          {
+            sw.WriteLine(e);
+          }
+          sw.WriteLine("\r\nUnmatched files:\r\n");
+          foreach(var uf in unmatchedFiles)
+          {
+            sw.WriteLine(uf);
+          }
         }
       }
     }
